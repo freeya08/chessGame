@@ -1,5 +1,9 @@
 {
     "editor.fontSize": 22,
     "debug.console.fontSize": 18,
-    "terminal.integrated.fontSize": 16
+    "terminal.integrated.fontSize": 16,
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.black-formatter",
+    "editor.formatOnSave": true
+  }
 }
