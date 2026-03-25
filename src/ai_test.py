@@ -1,6 +1,11 @@
 import chess
 import random
 
+# =====================
+# Model（資料層）
+# =====================
+
+# 駒の価値（評価用）
 PIECE_VALUES = {
     chess.PAWN: 1,
     chess.KNIGHT: 3,
@@ -10,31 +15,38 @@ PIECE_VALUES = {
     chess.KING: 0,
 }
 
+# 中央マス
 CENTER = [chess.D4, chess.E4, chess.D5, chess.E5]
 
 
+# =====================
+# ViewModel（ロジック層）
+# =====================
+
+
+# 手の評価関数
 def evaluate_move(board, move):
     score = 0
 
-    # 吃子加分
+    # 駒を取る → 加点
     if board.is_capture(move):
         captured_piece = board.piece_at(move.to_square)
         if captured_piece is not None:
             score += PIECE_VALUES.get(captured_piece.piece_type, 0)
 
-    # 模擬走一步
+    # 仮想的に手を実行
     board.push(move)
 
-    # 將死直接高分
+    # チェックメイト → 最優先
     if board.is_checkmate():
         board.pop()
         return 100
 
-    # 將軍加分
+    # チェック → 加点
     if board.is_check():
         score += 2
 
-    # 中心控制（簡化版：走到中心）
+    # 中央制御 → 加点
     if move.to_square in CENTER:
         score += 1
 
@@ -42,6 +54,7 @@ def evaluate_move(board, move):
     return score
 
 
+# 全合法手の評価一覧を作成
 def get_scored_moves(board):
     moves = list(board.legal_moves)
     scored_moves = []
@@ -53,6 +66,7 @@ def get_scored_moves(board):
     return scored_moves
 
 
+# 最適手の選択
 def choose_best_move(board):
     scored_moves = get_scored_moves(board)
 
@@ -66,33 +80,45 @@ def choose_best_move(board):
     return chosen_move, scored_moves, max_score
 
 
-def show_hint(board):
+# ヒント機能（View用のデータ生成）
+def get_hint(board):
     scored_moves = get_scored_moves(board)
 
     if not scored_moves:
-        print("No legal moves.")
-        return
+        return 0, [], None
 
     max_score = max(score for move, score in scored_moves)
-    best_moves = [move for move, score in scored_moves if score == max_score]
+    best_moves = [move.uci() for move, score in scored_moves if score == max_score]
 
-    # ===== 加分項 1：顯示合法手數量 =====
-    print("Number of legal moves:", len(scored_moves))
+    return len(scored_moves), best_moves, max_score
 
-    # ===== 這段是「列出所有候選手評分」的地方 =====
-    # 如果之後想重新顯示全部評分，把這段註解拿掉即可
-    #
-    # print("\n=== Hint: Your Candidate Moves ===")
-    # for move, score in scored_moves:
-    #     print(f"{move.uci()}  score={score}")
 
-    print("\n=== Suggested Best Moves ===")
-    print("Best score:", max_score)
-    print("Best moves:", [move.uci() for move in best_moves])
+# 結果判定（表示用）
+def get_result(board):
+    result = board.result()
 
+    if result == "1-0":
+        winner = "Player (White)"
+    elif result == "0-1":
+        winner = "AI (Black)"
+    else:
+        winner = "Draw"
+
+    if board.is_checkmate():
+        reason = "Checkmate"
+    else:
+        reason = "Draw condition"
+
+    return winner, reason
+
+
+# =====================
+# View（表示・入力）
+# =====================
 
 print("START")
 print("Type 'hint' if you want move suggestions.")
+
 board = chess.Board()
 
 while not board.is_game_over():
@@ -103,7 +129,10 @@ while not board.is_game_over():
         move = input("\nYour move (e2e4 / hint): ").strip()
 
         if move.lower() == "hint":
-            show_hint(board)
+            count, best_moves, best_score = get_hint(board)
+            print("Number of legal moves:", count)
+            print("Best score:", best_score)
+            print("Best moves:", best_moves)
             continue
 
         try:
@@ -116,19 +145,11 @@ while not board.is_game_over():
         break
 
     print("\nAI thinking...")
-    ai_move, ai_scored_moves, ai_best_score = choose_best_move(board)
+    ai_move, _, ai_best_score = choose_best_move(board)
 
     if ai_move is None:
         break
 
-    # ===== 這段是「AI列出所有候選手評分」的地方 =====
-    # 如果之後想重新顯示 AI 全部評分，把這段註解拿掉即可
-    #
-    # print("\n=== AI Candidate Moves ===")
-    # for move_obj, score in ai_scored_moves:
-    #     print(f"{move_obj.uci()}  score={score}")
-
-    # ===== 加分項 2：顯示 AI 最終選擇的分數 =====
     print("AI best score:", ai_best_score)
     print("AI chosen move:", ai_move.uci())
 
@@ -136,16 +157,6 @@ while not board.is_game_over():
 
 print("\nGame Over")
 
-result = board.result()
-
-if result == "1-0":
-    print("Winner: Player (White)")
-elif result == "0-1":
-    print("Winner: AI (Black)")
-else:
-    print("Result: Draw")
-
-if board.is_checkmate():
-    print("Reason: Checkmate")
-else:
-    print("Reason: Draw condition")
+winner, reason = get_result(board)
+print("Result:", winner)
+print("Reason:", reason)
